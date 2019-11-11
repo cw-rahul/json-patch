@@ -249,7 +249,121 @@ var Cases = []Case{
 		// size, so each copy operation increases the size by 50 bytes.
 		`[ { "op": "copy", "path": "/foo/-", "from": "/foo/1" },
 		   { "op": "copy", "path": "/foo/-", "from": "/foo/1" }]`,
-		fmt.Sprintf(`{ "foo": ["A", %q, %q, %q] }`, repeatedA(48), repeatedA(48), repeatedA(48)),
+		fmt.Sprintf(`{ "foo": ["A", %q] }`, repeatedA(48)),
+	},
+	{
+		`{"foo": ["bar", "baz", "qux"]}`,
+		`[{"op": "add", "path": "/foo/-", "value": "baz"}]`,
+		`{"foo": ["bar", "baz", "qux"]}`,
+	},
+	{
+		`{"foo": []}`,
+		`[{"op": "add", "path": "/foo/-", "value": "bar"}, {"op": "add", "path": "/foo/-", "value": "bar"}, {"op": "add", "path": "/foo/-", "value": "baz"}]`,
+		`{"foo": ["bar", "baz"]}`,
+	},
+	{
+		`{"foo": ["bar", "baz", "qux"]}`,
+		`[{"op": "replace", "path": "/foo/1", "value": "bar"}]`,
+		`{"foo": ["bar", "qux"]}`,
+	},
+	{
+		`{"foo": ["bar", "baz", "qux"], "one": "bar"}`,
+		`[{"op": "move", "from": "/one", "path": "/foo/-"}]`,
+		`{"foo": ["bar", "baz", "qux"]}`,
+	},
+	{
+		`{"foo": ["bar", "baz", "qux"], "one": "bar"}`,
+		`[{"op": "copy", "from": "/one", "path": "/foo/-"}]`,
+		`{"foo": ["bar", "baz", "qux"], "one": "bar"}`,
+	},
+	{
+		`{"foo": [{"bar": "baz", "one": "two"}]}`,
+		`[{"op": "add", "path": "/foo/-", "value": {"one": "two", "bar": "baz"}}]`,
+		`{"foo": [{"bar": "baz", "one": "two"}]}`,
+	},
+	{
+		`{"foo": [{"bar": "baz", "one": "two", "timestampUTC": "2019-08-26T00:00:00Z"}]}`,
+		`[{"op": "add", "path": "/foo/-", "value": {"one": "two", "bar": "baz", "timestampUTC": "2019-11-08T00:00:00Z"}}]`,
+		`{"foo": [{"bar": "baz", "one": "two", "timestampUTC": "2019-08-26T00:00:00Z"}]}`,
+	},
+	{
+		`{"foo": [{"bar": "baz", "one": "two", "timestampUTC": "2019-08-26T00:00:00Z"}], "more": {"one": "two", "bar": "baz", "timestampUTC": "2019-11-08T00:00:00Z"}}`,
+		`[{"op": "copy", "from": "/more", "path": "/foo/0"}]`,
+		`{"foo": [{"bar": "baz", "one": "two", "timestampUTC": "2019-08-26T00:00:00Z"}], "more": {"one": "two", "bar": "baz", "timestampUTC": "2019-11-08T00:00:00Z"}}`,
+	},
+	{
+		`{"foo": [{"bar": "baz", "qux": {"one": "two", "timestampUTC": "2019-08-26T00:00:00Z"}}]}`,
+		`[{"op": "add", "path": "/foo/-", "value": {"bar": "baz", "qux": {"one": "two", "timestampUTC": "2019-11-08T00:00:00Z"}}}]`,
+		`{"foo": [{"bar": "baz", "qux": {"one": "two", "timestampUTC": "2019-08-26T00:00:00Z"}}]}`,
+	},
+	{
+		`[{
+			"name": "ProhibitRemovableDevice",
+			"type": "SCHEDULE",
+			"version": "1.0",
+			"timestampUTC": "2019-08-26T00:00:00Z",
+			"path": "/scripting/scripting/command",
+			"task": "/schedule/",
+			"taskInput": "SKIPPED",
+			"executeNow": "true",
+			"schedule": "@every 7m45s"
+		}]`,
+		`[
+			{
+				"op": "add",
+				"path": "/-",
+				"value": {
+					"version": "1.0",
+					"type": "SCHEDULE",
+					"name": "ProhibitRemovableDevice",
+					"timestampUTC": "2019-08-27T00:00:00Z",
+					"path": "/scripting/scripting/command",
+					"task": "/schedule/",
+					"taskInput": "SKIPPED",
+					"executeNow": "true",
+					"schedule": "@every 7m45s"
+				}
+			},
+			{
+				"op": "add",
+				"path": "/-",
+				"value": {
+					"version": "1.0",
+					"type": "SCHEDULE",
+					"name": "ProhibitRemovableDevice",
+					"timestampUTC": "2019-08-28T00:00:00Z",
+					"path": "/scripting/scripting/command",
+					"task": "/schedule/",
+					"taskInput": "SKIPPED",
+					"executeNow": "true",
+					"schedule": "@every 10m"
+				}
+			}
+		]`,
+		`[
+			{
+				"name": "ProhibitRemovableDevice",
+				"type": "SCHEDULE",
+				"version": "1.0",
+				"timestampUTC": "2019-08-26T00:00:00Z",
+				"path": "/scripting/scripting/command",
+				"task": "/schedule/",
+				"taskInput": "SKIPPED",
+				"executeNow": "true",
+				"schedule": "@every 7m45s"
+			},
+			{
+				"version": "1.0",
+				"type": "SCHEDULE",
+				"name": "ProhibitRemovableDevice",
+				"timestampUTC": "2019-08-28T00:00:00Z",
+				"path": "/scripting/scripting/command",
+				"task": "/schedule/",
+				"taskInput": "SKIPPED",
+				"executeNow": "true",
+				"schedule": "@every 10m"
+			}
+		]`,
 	},
 }
 
@@ -340,11 +454,6 @@ var BadCases = []BadCase{
 	{
 		`{ "foo": ["bar"]}`,
 		`[{"op": "copy", "path": "/foo/6666666666", "from": "/"}]`,
-	},
-	// Can't copy into an index greater than the size of the array
-	{
-		`{ "foo": ["bar"]}`,
-		`[{"op": "copy", "path": "/foo/2", "from": "/foo/0"}]`,
 	},
 	// Accumulated copy size cannot exceed AccumulatedCopySizeLimit.
 	{
