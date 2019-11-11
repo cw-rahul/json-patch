@@ -206,6 +206,21 @@ func (n *lazyNode) equal(o *lazyNode) bool {
 			return false
 		}
 
+		// ignore timestampUTC field during comparison
+		if ts, ok := n.doc["timestampUTC"]; ok {
+			delete(n.doc, "timestampUTC")
+			defer func(ts *lazyNode) { n.doc["timestampUTC"] = ts }(ts)
+		}
+
+		if ts, ok := o.doc["timestampUTC"]; ok {
+			delete(o.doc, "timestampUTC")
+			defer func(ts *lazyNode) { o.doc["timestampUTC"] = ts }(ts)
+		}
+
+		if len(n.doc) != len(o.doc) {
+			return false
+		}
+
 		for k, v := range n.doc {
 			ov, ok := o.doc[k]
 
@@ -443,11 +458,34 @@ func (d *partialArray) set(key string, val *lazyNode) error {
 	if err != nil {
 		return err
 	}
+
+	// do not add value if it's already in the array
+	if d != nil && val != nil {
+		for i, el := range *d {
+			if i == idx {
+				continue
+			}
+
+			if el != nil && val.equal(el) {
+				return d.remove(strconv.Itoa(idx))
+			}
+		}
+	}
+
 	(*d)[idx] = val
 	return nil
 }
 
 func (d *partialArray) add(key string, val *lazyNode) error {
+	// do not add value if it's already in the array
+	if d != nil && val != nil {
+		for _, el := range *d {
+			if el != nil && val.equal(el) {
+				return nil
+			}
+		}
+	}
+
 	if key == "-" {
 		*d = append(*d, val)
 		return nil
