@@ -466,8 +466,14 @@ func (d *partialArray) set(key string, val *lazyNode) error {
 				continue
 			}
 
-			if el != nil && val.equal(el) {
-				return d.remove(strconv.Itoa(idx))
+			if el != nil {
+				eq, err := noSideEffectsEqual(val, el)
+				if err != nil {
+					return err
+				}
+				if eq {
+					return d.remove(strconv.Itoa(idx))
+				}
 			}
 		}
 	}
@@ -480,8 +486,14 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 	// do not add value if it's already in the array
 	if d != nil && val != nil {
 		for _, el := range *d {
-			if el != nil && val.equal(el) {
-				return nil
+			if el != nil {
+				eq, err := noSideEffectsEqual(val, el)
+				if err != nil {
+					return err
+				}
+				if eq {
+					return nil
+				}
 			}
 		}
 	}
@@ -872,4 +884,30 @@ var (
 
 func decodePatchKey(k string) string {
 	return rfc6901Decoder.Replace(k)
+}
+
+// noSideEffectsEqual calls *lazyNode.equal for copies of nodes so that there are no side effects
+// because *lazyNode.equal has undesirable side effect that causes object properties to lose their ordering
+func noSideEffectsEqual(a, b *lazyNode) (bool, error) {
+	if a == nil && b == nil {
+		return true, nil
+	}
+
+	if a == nil || b == nil {
+		return false, nil
+	}
+
+	//return a.copy().equal(b.copy())
+
+	aCopy, _, err := deepCopy(a)
+	if err != nil {
+		return false, err
+	}
+
+	bCopy, _, err := deepCopy(b)
+	if err != nil {
+		return false, err
+	}
+
+	return aCopy.equal(bCopy), nil
 }
