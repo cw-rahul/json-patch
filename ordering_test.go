@@ -7,13 +7,13 @@ import (
 var N = 100 // number of patch apply iterations
 
 func TestAdd(t *testing.T) {
-	reference, err := apply(original, addPatches)
+	reference, err := apply(original, patches)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := 0; i < N; i++ {
-		p, err := apply(original, addPatches)
+		p, err := apply(original, patches)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +40,7 @@ func apply(original, p string) (string, error) {
 
 var original = `{"rules": []}`
 
-var addPatches = `
+var patches = `
 [
   {
     "op": "add",
