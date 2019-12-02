@@ -140,6 +140,81 @@ var addPatches = `
         ]
       }
     }
+  },
+  {
+    "op": "add",
+    "path": "/rules/-",
+    "value": {
+      "collector": "winlog",
+      "description": "MSSQL - Another one",
+      "eventDetails": {
+        "facility": 18,
+        "source": "MSSQLSERVER",
+        "eventIDs": [
+          "12289",
+          "2"
+        ],
+        "severity": [
+          3,
+          5
+        ]
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/rules/-",
+    "value": {
+      "collector": "winlog",
+      "description": "MSSQL - Another one",
+      "eventDetails": {
+        "facility": 18,
+        "foo": "bar",
+        "source": "MSSQLSERVER",
+        "eventIDs": [
+          "12289",
+          "2"
+        ],
+        "severity": [
+          3,
+          5
+        ]
+      }
+    }
+  },
+  {
+  	"op": "copy",
+  	"from": "/rules/0",
+  	"path": "/rules/-"
+  },
+  {
+  	"op": "replace",
+  	"path": "/rules/1",
+  	"value": {
+      "collector": "winlog",
+      "description": "Uninterruptible Power Supply - AVR Trim Active_closing",
+      "eventDetails": {
+        "facility": 18,
+        "source": "APCPBEAgent",
+        "eventIDs": [
+          "1056",
+          "1060",
+          "42"
+        ],
+        "severity": [
+          5
+        ]
+      }
+    }
+  },
+  {
+  	"op": "move",
+  	"from": "/rules/0",
+  	"path": "/rules/-"
+  },
+  {
+  	"op": "remove",
+  	"path": "/rules/0"
   }
 ]
 `
