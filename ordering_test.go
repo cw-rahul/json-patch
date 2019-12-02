@@ -6,12 +6,13 @@ import (
 
 var N = 100 // number of patch apply iterations
 
-func TestAdd(t *testing.T) {
+func TestOrdering(t *testing.T) {
 	reference, err := apply(original, patches)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// apply patches N times and make sure that we get the same result each time
 	for i := 0; i < N; i++ {
 		p, err := apply(original, patches)
 		if err != nil {
