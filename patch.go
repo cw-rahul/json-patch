@@ -27,7 +27,7 @@ var (
 	AccumulatedCopySizeLimit int64 = 0
 	// Regular expression that describes format for dynamic expressions used in
 	// JsonPointer enhancement.
-	keyExpressionPattern = regexp.MustCompile(`^{'(.*)':'(.*)'}$`)
+	keyExpressionPattern = regexp.MustCompile(`^{'(.*)'\s*:\s*'(.*)'}$`)
 )
 
 var (
