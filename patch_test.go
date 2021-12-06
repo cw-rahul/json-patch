@@ -43,6 +43,38 @@ func applyPatch(doc, patch string) (string, error) {
 	return string(out), nil
 }
 
+func applyPatchImpl_allowRemove(doc, patch string) (string, error) {
+	obj, err := DecodePatch([]byte(patch))
+
+	if err != nil {
+		panic(err)
+	}
+
+	out, err := obj.ApplyIndentAllowRemove([]byte(doc), "", true)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
+}
+
+func applyPatchImpl_dontAllowRemove(doc, patch string) (string, error) {
+	obj, err := DecodePatch([]byte(patch))
+
+	if err != nil {
+		panic(err)
+	}
+
+	out, err := obj.ApplyIndentAllowRemove([]byte(doc), "", false)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
+}
+
 type Case struct {
 	doc, patch, result string
 }
@@ -380,6 +412,9 @@ var Cases = []Case{
 type BadCase struct {
 	doc, patch string
 }
+type BadCases_remove struct {
+	doc, patch string
+}
 
 var MutationTestCases = []BadCase{
 	{
@@ -480,6 +515,29 @@ var BadCases = []BadCase{
 	},
 }
 
+var BadCasesRemove = []BadCases_remove{
+	{
+		`{ "a": { "b": { "d": 1 } } }`,
+		`[ { "op": "remove", "path": "/a/b/c" } ]`,
+	},
+	{
+		`{ "a": { "b": [1] } }`,
+		`[ { "op": "remove", "path": "/a/b/1" } ]`,
+	},
+	{
+		`{ "foo": []}`,
+		`[ {"op": "remove", "path": "/foo/-"}]`,
+	},
+	{
+		`{ "foo": []}`,
+		`[ {"op": "remove", "path": "/foo/-1"}]`,
+	},
+	{
+		`{ "foo": ["bar"]}`,
+		`[ {"op": "remove", "path": "/foo/-2"}]`,
+	},
+}
+
 // This is not thread safe, so we cannot run patch tests in parallel.
 func configureGlobals(accumulatedCopySizeLimit int64) func() {
 	oldAccumulatedCopySizeLimit := AccumulatedCopySizeLimit
@@ -532,6 +590,106 @@ func TestAllCases(t *testing.T) {
 
 	for _, c := range BadCases {
 		_, err := applyPatch(c.doc, c.patch)
+
+		if err == nil {
+			t.Errorf("Patch %q should have failed to apply but it did not", c.patch)
+		}
+	}
+}
+
+func TestAllCasesImpl_allowRemove(t *testing.T) {
+	defer configureGlobals(int64(100))()
+	for _, c := range ExprCases {
+		out, err := applyPatchImpl_allowRemove(c.doc, c.patch)
+
+		if err != nil {
+			t.Errorf("Unable to apply patch: %s", err)
+		}
+
+		if !compareJSON(out, c.result) {
+			t.Errorf("Patch did not apply. Expected:\n%s\n\nActual:\n%s\nPatch:%s\n",
+				reformatJSON(c.result), reformatJSON(out), reformatJSON(c.patch))
+		}
+	}
+
+	for _, c := range Cases {
+		out, err := applyPatchImpl_allowRemove(c.doc, c.patch)
+
+		if err != nil {
+			t.Errorf("Unable to apply patch: %s", err)
+		}
+
+		if !compareJSON(out, c.result) {
+			t.Errorf("Patch did not apply. Expected:\n%s\n\nActual:\n%s\nPatch:%s\n",
+				reformatJSON(c.result), reformatJSON(out), reformatJSON(c.patch))
+		}
+	}
+
+	for _, c := range MutationTestCases {
+		out, err := applyPatchImpl_allowRemove(c.doc, c.patch)
+
+		if err != nil {
+			t.Errorf("Unable to apply patch: %s", err)
+		}
+
+		if compareJSON(out, c.doc) {
+			t.Errorf("Patch did not apply. Original:\n%s\n\nPatched:\n%s",
+				reformatJSON(c.doc), reformatJSON(out))
+		}
+	}
+
+	for _, c := range BadCasesRemove {
+		_, err := applyPatchImpl_allowRemove(c.doc, c.patch)
+
+		if err != nil {
+			t.Errorf("Patch %q should have failed to apply but it did not", c.patch)
+		}
+	}
+}
+
+func TestAllCasesImpl_dontAllow(t *testing.T) {
+	defer configureGlobals(int64(100))()
+	for _, c := range ExprCases {
+		out, err := applyPatchImpl_dontAllowRemove(c.doc, c.patch)
+
+		if err != nil {
+			t.Errorf("Unable to apply patch: %s", err)
+		}
+
+		if !compareJSON(out, c.result) {
+			t.Errorf("Patch did not apply. Expected:\n%s\n\nActual:\n%s\nPatch:%s\n",
+				reformatJSON(c.result), reformatJSON(out), reformatJSON(c.patch))
+		}
+	}
+
+	for _, c := range Cases {
+		out, err := applyPatchImpl_dontAllowRemove(c.doc, c.patch)
+
+		if err != nil {
+			t.Errorf("Unable to apply patch: %s", err)
+		}
+
+		if !compareJSON(out, c.result) {
+			t.Errorf("Patch did not apply. Expected:\n%s\n\nActual:\n%s\nPatch:%s\n",
+				reformatJSON(c.result), reformatJSON(out), reformatJSON(c.patch))
+		}
+	}
+
+	for _, c := range MutationTestCases {
+		out, err := applyPatchImpl_dontAllowRemove(c.doc, c.patch)
+
+		if err != nil {
+			t.Errorf("Unable to apply patch: %s", err)
+		}
+
+		if compareJSON(out, c.doc) {
+			t.Errorf("Patch did not apply. Original:\n%s\n\nPatched:\n%s",
+				reformatJSON(c.doc), reformatJSON(out))
+		}
+	}
+
+	for _, c := range BadCases {
+		_, err := applyPatchImpl_dontAllowRemove(c.doc, c.patch)
 
 		if err == nil {
 			t.Errorf("Patch %q should have failed to apply but it did not", c.patch)
@@ -624,6 +782,22 @@ func TestAllTest(t *testing.T) {
 	for _, c := range TestCases {
 		_, err := applyPatch(c.doc, c.patch)
 
+		if c.result && err != nil {
+			t.Errorf("Testing failed when it should have passed: %s", err)
+		} else if !c.result && err == nil {
+			t.Errorf("Testing passed when it should have faild: %s", err)
+		} else if !c.result {
+			expected := fmt.Sprintf("testing value %s failed: test failed", c.failedPath)
+			if err.Error() != expected {
+				t.Errorf("Testing failed as expected but invalid message: expected [%s], got [%s]", expected, err)
+			}
+		}
+	}
+}
+
+func TestAllTest1(t *testing.T) {
+	for _, c := range TestCases {
+		_, err := applyPatchImpl_allowRemove(c.doc, c.patch)
 		if c.result && err != nil {
 			t.Errorf("Testing failed when it should have passed: %s", err)
 		} else if !c.result && err == nil {

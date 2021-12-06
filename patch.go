@@ -644,6 +644,27 @@ func (p Patch) remove(doc *container, op Operation) error {
 	return nil
 }
 
+func (p Patch) removeImpl(doc *container, op Operation, allowMissingPathOnRemove bool) error {
+	path, err := op.Path()
+	if err != nil {
+		return errors.Wrapf(ErrMissing, "remove operation failed to decode path")
+	}
+
+	con, key := findObject(doc, path)
+
+	if con == nil {
+		return errors.Wrapf(ErrMissing, "remove operation does not apply: doc is missing path: \"%s\"", path)
+	}
+
+	err = con.remove(key)
+	// return nil if patch to be removed not found
+	if err != nil && !allowMissingPathOnRemove {
+		return errors.Wrapf(err, "error in remove for path: '%s'", path)
+	}
+
+	return nil
+}
+
 func (p Patch) replace(doc *container, op Operation) error {
 	path, err := op.Path()
 	if err != nil {
@@ -847,6 +868,55 @@ func (p Patch) ApplyIndent(doc []byte, indent string) ([]byte, error) {
 			err = p.add(&pd, op)
 		case "remove":
 			err = p.remove(&pd, op)
+		case "replace":
+			err = p.replace(&pd, op)
+		case "move":
+			err = p.move(&pd, op)
+		case "test":
+			err = p.test(&pd, op)
+		case "copy":
+			err = p.copy(&pd, op, &accumulatedCopySize)
+		default:
+			err = fmt.Errorf("Unexpected kind: %s", op.Kind())
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if indent != "" {
+		return json.MarshalIndent(pd, "", indent)
+	}
+
+	return json.Marshal(pd)
+}
+
+// functionality is same as ApplyIndent in addition it doesn't return error if object is not present on path
+func (p Patch) ApplyIndentAllowRemove(doc []byte, indent string, allowMissingPathOnRemove bool) ([]byte, error) {
+	var pd container
+	if doc[0] == '[' {
+		pd = &partialArray{}
+	} else {
+		pd = &partialDoc{}
+	}
+
+	err := json.Unmarshal(doc, pd)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = nil
+
+	var accumulatedCopySize int64
+
+	for _, op := range p {
+		switch op.Kind() {
+		case "add":
+			err = p.add(&pd, op)
+		case "remove":
+			err = p.removeImpl(&pd, op, allowMissingPathOnRemove)
 		case "replace":
 			err = p.replace(&pd, op)
 		case "move":
